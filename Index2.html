@@ -1,0 +1,2040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VCFO — Virtual CFO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+/* ═══════════════════════════════════════════════
+   CSS VARIABLES & RESET — WhatsApp Theme
+═══════════════════════════════════════════════ */
+:root {
+  /* WhatsApp dark backgrounds */
+  --bg-deep:     #0b141a;
+  --bg-base:     #111b21;
+  --bg-card:     #202c33;
+  --bg-card2:    #2a3942;
+  --bg-elevated: #2a3942;
+  --border:      #2a3942;
+  --border-glow: #3d5a66;
+
+  /* WhatsApp greens */
+  --wa-green:      #00a884;
+  --wa-green-dark: #008069;
+  --wa-green-light:#25d366;
+  --wa-green-glow: rgba(0,168,132,0.15);
+  --wa-teal-header:#1f2c34;
+  --wa-teal-nav:   #1f2c34;
+
+  /* Accent colors */
+  --amber:       #ffd279;
+  --amber-dim:   #c9954a;
+  --amber-glow:  rgba(255,210,121,0.12);
+  --green:       #25d366;
+  --green-dim:   #128c7e;
+  --green-glow:  rgba(37,211,102,0.12);
+  --red:         #ff6b6b;
+  --red-dim:     #c0392b;
+  --red-glow:    rgba(255,107,107,0.12);
+  --blue:        #53bdeb;
+  --blue-glow:   rgba(83,189,235,0.12);
+  --purple:      #c8a4e0;
+
+  /* Text */
+  --text-primary:   #e9edef;
+  --text-secondary: #8696a0;
+  --text-muted:     #3d5a66;
+  --text-accent:    #00a884;
+
+  /* Fonts — WhatsApp uses SF Pro / system sans */
+  --font-display: 'Nunito', sans-serif;
+  --font-mono:    'Inter', sans-serif;
+
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  18px;
+  --radius-xl:  24px;
+  --radius-bubble: 18px;
+
+  --nav-height: 60px;
+  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* WhatsApp-style chat wallpaper pattern */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.015) 1px, transparent 0);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app { position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════ */
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+}
+
+.page {
+  display: none;
+  padding: 0 0 calc(var(--nav-height) + 16px);
+  min-height: 100vh;
+  animation: pageIn 0.25s ease;
+}
+.page.active { display: block; }
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════
+   HEADER — WhatsApp teal bar
+═══════════════════════════════════════════════ */
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--wa-teal-header);
+  border-bottom: none;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.page-header h1 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+.header-badge {
+  background: var(--wa-green);
+  border: none;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+.btn-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+  font-size: 1.1rem;
+}
+.btn-icon:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+
+/* ═══════════════════════════════════════════════
+   BOTTOM NAV — WhatsApp style
+═══════════════════════════════════════════════ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  height: var(--nav-height);
+  background: var(--wa-teal-nav);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  z-index: 200;
+}
+.nav-item {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  position: relative;
+  color: rgba(233,237,239,0.5);
+  transition: var(--transition);
+  border: none;
+  background: none;
+  font-family: var(--font-mono);
+}
+.nav-item .nav-icon { font-size: 1.25rem; transition: var(--transition); }
+.nav-item .nav-label { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.nav-item.active { color: var(--wa-green-light); }
+.nav-item.active .nav-icon { transform: translateY(-1px); }
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 20%; right: 20%;
+  height: 2px;
+  background: var(--wa-green-light);
+  border-radius: 2px 2px 0 0;
+}
+
+/* ═══════════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════════ */
+.card {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  transition: var(--transition);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.kpi-card {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.kpi-card.amber::before { background: var(--amber); }
+.kpi-card.green::before { background: var(--wa-green-light); }
+.kpi-card.red::before   { background: var(--red); }
+.kpi-card.blue::before  { background: var(--blue); }
+
+.kpi-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.kpi-value.amber { color: var(--amber); }
+.kpi-value.green { color: var(--wa-green-light); }
+.kpi-value.red   { color: var(--red); }
+.kpi-value.blue  { color: var(--blue); }
+
+.kpi-sub {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ═══════════════════════════════════════════════
+   AI CARD — WhatsApp chat bubble style
+═══════════════════════════════════════════════ */
+.ai-card {
+  margin: 0 16px 12px;
+  background: #1a2e23;
+  border: none;
+  border-radius: var(--radius-bubble);
+  border-top-left-radius: 4px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--wa-green), var(--wa-green-light));
+}
+.ai-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.ai-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--wa-green-light);
+  box-shadow: 0 0 6px var(--wa-green-light);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.ai-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wa-green);
+}
+.ai-insight {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.ai-insight strong { color: var(--wa-green-light); }
+.ai-row {
+  display: flex; gap: 8px;
+  margin-top: 10px;
+}
+.ai-tag {
+  flex: 1;
+  background: rgba(0,168,132,0.08);
+  border: 1px solid rgba(0,168,132,0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.6rem;
+}
+.ai-tag-label { color: var(--wa-green); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3px; font-weight: 600; }
+.ai-tag-val   { color: var(--text-primary); font-size: 0.72rem; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════
+   HEALTH BAR
+═══════════════════════════════════════════════ */
+.health-bar-wrap {
+  margin: 0 16px 12px;
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.health-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.health-label { font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase; }
+.health-status { font-size: 0.68rem; font-weight: 700; }
+.health-track {
+  height: 5px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.health-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION HEADERS
+═══════════════════════════════════════════════ */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 6px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wa-green);
+}
+.section-count {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--wa-green);
+  padding: 2px 9px;
+  border-radius: 20px;
+}
+
+/* ═══════════════════════════════════════════════
+   TABLE / LIST ITEMS — WhatsApp chat list style
+═══════════════════════════════════════════════ */
+.data-list { padding: 0 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.data-item {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+  transition: var(--transition);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.data-item:hover { background: var(--bg-card2); }
+.data-item:active { background: #2d3f48; }
+
+.data-item-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+}
+.avatar-green  { background: #1a3a2a; color: var(--wa-green-light); }
+.avatar-red    { background: #3a1a1a; color: var(--red); }
+.avatar-amber  { background: #3a2e10; color: var(--amber); }
+.avatar-blue   { background: #0f2a3a; color: var(--blue); }
+
+.data-item-body { flex: 1; min-width: 0; }
+.data-item-name { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.data-item-sub  { font-size: 0.68rem; color: var(--text-secondary); margin-top: 3px; }
+.data-item-right { text-align: right; flex-shrink: 0; }
+.data-item-amount { font-size: 0.88rem; font-weight: 700; font-family: var(--font-display); }
+.data-item-due    { font-size: 0.62rem; color: var(--text-secondary); margin-top: 3px; }
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.badge-expected  { background: rgba(83,189,235,0.15);  color: var(--blue); }
+.badge-followup  { background: rgba(255,210,121,0.15); color: var(--amber); }
+.badge-promise   { background: rgba(200,164,224,0.15); color: var(--purple); }
+.badge-received  { background: rgba(37,211,102,0.15);  color: var(--wa-green-light); }
+.badge-overdue   { background: rgba(255,107,107,0.15); color: var(--red); }
+.badge-paid      { background: rgba(37,211,102,0.15);  color: var(--wa-green-light); }
+.badge-critical  { background: rgba(255,107,107,0.15); color: var(--red); }
+.badge-important { background: rgba(255,210,121,0.15); color: var(--amber); }
+.badge-canwait   { background: rgba(83,189,235,0.15);  color: var(--blue); }
+
+/* Item actions */
+.item-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.btn-xs {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-xs:hover         { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+.btn-xs.success:hover { background: rgba(37,211,102,0.18); color: var(--wa-green-light); }
+.btn-xs.danger:hover  { background: rgba(255,107,107,0.18); color: var(--red); }
+
+/* ═══════════════════════════════════════════════
+   FAB BUTTON — WhatsApp green circle
+═══════════════════════════════════════════════ */
+.fab {
+  position: fixed;
+  bottom: calc(var(--nav-height) + 16px);
+  right: max(16px, calc(50vw - 240px + 16px));
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--wa-green);
+  color: #fff;
+  font-size: 1.5rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,168,132,0.4);
+  border: none;
+  transition: var(--transition);
+  z-index: 150;
+}
+.fab:hover  { background: var(--wa-green-dark); box-shadow: 0 6px 20px rgba(0,168,132,0.5); transform: scale(1.05); }
+.fab:active { transform: scale(0.95); }
+
+/* ═══════════════════════════════════════════════
+   MODAL — sheet style
+═══════════════════════════════════════════════ */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 500;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.modal-overlay.open {
+  display: flex;
+  animation: overlayIn 0.2s ease;
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.modal {
+  width: 100%; max-width: 480px;
+  background: var(--bg-base);
+  border: none;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px 32px;
+  max-height: 88vh;
+  overflow-y: auto;
+  animation: modalIn 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes modalIn {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.modal-handle {
+  width: 36px; height: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 18px;
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════════
+   FORMS
+═══════════════════════════════════════════════ */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wa-green);
+  margin-bottom: 6px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--bg-card);
+  border: none;
+  border-bottom: 2px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  transition: var(--transition);
+  outline: none;
+  -webkit-appearance: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-bottom-color: var(--wa-green);
+  background: var(--bg-card2);
+}
+.form-select { cursor: pointer; }
+.form-select option { background: var(--bg-card); }
+.form-textarea { resize: vertical; min-height: 80px; border-radius: var(--radius-sm); }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.btn-primary {
+  width: 100%;
+  background: var(--wa-green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-xl);
+  padding: 14px;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 8px;
+}
+.btn-primary:hover  { background: var(--wa-green-dark); box-shadow: 0 4px 14px rgba(0,168,132,0.35); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-secondary {
+  width: 100%;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--radius-xl);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 4px;
+}
+.btn-secondary:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+/* ═══════════════════════════════════════════════
+   TRANSACTIONS
+═══════════════════════════════════════════════ */
+.tx-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.tx-item:hover { background: var(--bg-card2); }
+.tx-icon {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.tx-body { flex: 1; min-width: 0; }
+.tx-cat  { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.tx-desc { font-size: 0.66rem; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-right { text-align: right; }
+.tx-amount { font-size: 0.88rem; font-weight: 700; font-family: var(--font-display); }
+.tx-date   { font-size: 0.6rem; color: var(--text-secondary); margin-top: 2px; }
+
+/* ═══════════════════════════════════════════════
+   QUICK ENTRY
+═══════════════════════════════════════════════ */
+.quick-wrap { padding: 16px; }
+.quick-header { text-align: center; margin-bottom: 20px; }
+.quick-logo {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--wa-green-light);
+  letter-spacing: -0.02em;
+}
+.quick-sub {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.quick-box {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.quick-textarea {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: none;
+  min-height: 110px;
+  outline: none;
+  transition: var(--transition);
+}
+.quick-textarea:focus {
+  background: var(--bg-card2);
+  box-shadow: 0 0 0 2px var(--wa-green);
+}
+.quick-textarea::placeholder { color: var(--text-muted); }
+.quick-examples { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.quick-example {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  background: rgba(0,168,132,0.06);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid rgba(0,168,132,0.15);
+}
+.quick-example:hover { background: rgba(0,168,132,0.12); color: var(--text-primary); }
+.quick-example::before { content: '→ '; color: var(--wa-green-light); }
+
+.quick-entries-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.qe-item {
+  background: #1a2e23;
+  border: none;
+  border-radius: var(--radius-bubble);
+  border-top-left-radius: 4px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.qe-text { font-size: 0.8rem; color: var(--text-primary); line-height: 1.5; }
+.qe-meta { font-size: 0.6rem; color: var(--wa-green); margin-top: 5px; text-align: right; }
+
+/* ═══════════════════════════════════════════════
+   EMPTY STATE
+═══════════════════════════════════════════════ */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-muted);
+}
+.empty-icon { font-size: 2.8rem; margin-bottom: 12px; opacity: 0.4; }
+.empty-text { font-size: 0.8rem; line-height: 1.6; color: var(--text-secondary); }
+
+/* ═══════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  top: 20px; left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: #2a3942;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: var(--radius-xl);
+  z-index: 9000;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.toast.show   { transform: translateX(-50%) translateY(0); }
+.toast.success { background: #1a3a2a; color: var(--wa-green-light); }
+.toast.error   { background: #3a1a1a; color: var(--red); }
+
+/* ═══════════════════════════════════════════════
+   LOADING
+═══════════════════════════════════════════════ */
+.loader {
+  display: flex; align-items: center; justify-content: center;
+  padding: 36px; gap: 6px;
+}
+.loader-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--wa-green);
+  animation: loaderBounce 1.2s infinite;
+}
+.loader-dot:nth-child(2) { animation-delay: 0.2s; }
+.loader-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes loaderBounce {
+  0%,80%,100% { transform: scale(0.6); opacity: 0.3; }
+  40%          { transform: scale(1);   opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD SPECIFIC
+═══════════════════════════════════════════════ */
+.dash-top {
+  background: var(--wa-teal-header);
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+.dash-greeting {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(233,237,239,0.6);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.dash-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.dash-title span { color: var(--wa-green-light); }
+.dash-date {
+  font-size: 0.65rem;
+  color: rgba(233,237,239,0.55);
+  margin-top: 2px;
+}
+
+/* Recent activity list */
+.activity-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-dot {
+  width: 7px; height: 7px; flex-shrink: 0;
+  border-radius: 50%;
+}
+.activity-text { font-size: 0.75rem; color: var(--text-secondary); flex: 1; }
+.activity-time { font-size: 0.65rem; font-weight: 700; }
+
+/* Supabase config banner */
+.config-banner {
+  margin: 10px 12px;
+  background: rgba(0,168,132,0.07);
+  border: 1px solid rgba(0,168,132,0.25);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 0.72rem;
+  color: var(--wa-green);
+  line-height: 1.5;
+}
+.config-banner strong { display: block; margin-bottom: 4px; color: var(--wa-green-light); font-weight: 700; }
+.config-inputs { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.config-save {
+  margin-top: 10px;
+  background: var(--wa-green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-xl);
+  padding: 9px 20px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.config-save:hover { background: var(--wa-green-dark); }
+
+/* Scroll area padding */
+.scroll-pad { padding-bottom: 20px; }
+
+/* Net position card */
+.net-card {
+  margin: 10px 12px;
+  background: linear-gradient(135deg, #1a3a2a 0%, #0f2419 100%);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.net-label { font-size: 0.65rem; font-weight: 700; color: var(--wa-green); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 4px; }
+.net-amount { font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; color: var(--wa-green-light); }
+.net-icon { font-size: 2.2rem; opacity: 0.3; }
+
+/* Filter tabs */
+.filter-tabs {
+  display: flex; gap: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--bg-deep);
+}
+.filter-tabs::-webkit-scrollbar { display: none; }
+.filter-tab {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: none;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.filter-tab.active {
+  background: var(--wa-green);
+  color: #fff;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══ TOAST ═══ -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: DASHBOARD
+  ═══════════════════════════════════════ -->
+  <div class="page active" id="page-home">
+    <div class="dash-top">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--wa-green);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">💼</div>
+        <div style="flex:1">
+          <div class="dash-title">VCFO <span>Finance</span></div>
+          <div class="dash-date" id="dash-date" style="color:rgba(233,237,239,0.6);font-size:0.68rem"></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);font-size:1.1rem" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'">🔍</div>
+          <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);font-size:1.1rem" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'">⋮</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Config Banner (shown until configured) -->
+    <div class="config-banner" id="config-banner">
+      <strong>⚙ Supabase Configuration Required</strong>
+      Enter your Supabase project URL and anon key to connect live data.
+      <div class="config-inputs">
+        <input class="form-input" id="cfg-url" placeholder="https://xxxx.supabase.co" style="font-size:0.7rem;padding:7px 10px;">
+        <input class="form-input" id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIs..." style="font-size:0.7rem;padding:7px 10px;">
+      </div>
+      <button class="config-save" onclick="saveSupabaseConfig()">Connect →</button>
+    </div>
+
+    <!-- Net Position -->
+    <div class="net-card" id="net-card">
+      <div>
+        <div class="net-label">Net Position</div>
+        <div class="net-amount" id="net-amount">₹0</div>
+      </div>
+      <div class="net-icon">◈</div>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="card-grid">
+      <div class="kpi-card amber">
+        <div class="kpi-label">Cash Available</div>
+        <div class="kpi-value amber" id="kpi-cash">₹0</div>
+        <div class="kpi-sub">income − expenses</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-label">To Receive</div>
+        <div class="kpi-value blue" id="kpi-recv">₹0</div>
+        <div class="kpi-sub">pending receivables</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">To Pay</div>
+        <div class="kpi-value red" id="kpi-pay">₹0</div>
+        <div class="kpi-sub">pending payables</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Total Income</div>
+        <div class="kpi-value green" id="kpi-income">₹0</div>
+        <div class="kpi-sub">this month</div>
+      </div>
+    </div>
+
+    <!-- Health Bar -->
+    <div class="health-bar-wrap">
+      <div class="health-row">
+        <span class="health-label">Financial Health</span>
+        <span class="health-status" id="health-status-text">—</span>
+      </div>
+      <div class="health-track">
+        <div class="health-fill" id="health-fill" style="width:0%;background:var(--amber);"></div>
+      </div>
+    </div>
+
+    <!-- AI Card -->
+    <div class="ai-card">
+      <div class="ai-header">
+        <div class="ai-dot"></div>
+        <div class="ai-title">AI Advisor</div>
+      </div>
+      <div class="ai-insight" id="ai-text">Analyzing your financial position...</div>
+      <div class="ai-row">
+        <div class="ai-tag">
+          <div class="ai-tag-label">Priority Collect</div>
+          <div class="ai-tag-val" id="ai-collect">—</div>
+        </div>
+        <div class="ai-tag">
+          <div class="ai-tag-label">Priority Pay</div>
+          <div class="ai-tag-val" id="ai-pay">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="section-header">
+      <div class="section-title">Recent Activity</div>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div class="card">
+        <div id="activity-list">
+          <div class="loader"><div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: RECEIVABLES
+  ════════════════════════════════════════ -->
+  <div class="page" id="page-collect">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:50%;background:var(--wa-green);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">📥</div>
+        <div>
+          <h1>Receivables</h1>
+          <div style="font-size:0.65rem;color:rgba(233,237,239,0.55);margin-top:1px" id="recv-sub-label">Loading...</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span class="header-badge" id="recv-count-badge">0</span>
+        <div class="btn-icon">⋮</div>
+      </div>
+    </div>
+    <div class="filter-tabs" id="recv-filters">
+      <div class="filter-tab active" data-filter="all" onclick="filterReceivables(this,'all')">All</div>
+      <div class="filter-tab" data-filter="Expected" onclick="filterReceivables(this,'Expected')">Expected</div>
+      <div class="filter-tab" data-filter="Follow Up" onclick="filterReceivables(this,'Follow Up')">Follow Up</div>
+      <div class="filter-tab" data-filter="Promise To Pay" onclick="filterReceivables(this,'Promise To Pay')">Promise To Pay</div>
+      <div class="filter-tab" data-filter="Overdue" onclick="filterReceivables(this,'Overdue')">Overdue</div>
+      <div class="filter-tab" data-filter="Received" onclick="filterReceivables(this,'Received')">Received</div>
+    </div>
+    <div class="data-list scroll-pad" id="recv-list">
+      <div class="loader"><div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div></div>
+    </div>
+    <button class="fab" onclick="openModal('modal-recv')">＋</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: PAYABLES
+  ════════════════════════════════════════ -->
+  <div class="page" id="page-pay">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:50%;background:#c0392b;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">📤</div>
+        <div>
+          <h1>Payables</h1>
+          <div style="font-size:0.65rem;color:rgba(233,237,239,0.55);margin-top:1px" id="pay-sub-label">Loading...</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span class="header-badge" id="pay-count-badge">0</span>
+        <div class="btn-icon">⋮</div>
+      </div>
+    </div>
+    <div class="filter-tabs">
+      <div class="filter-tab active" onclick="filterPayables(this,'all')">All</div>
+      <div class="filter-tab" onclick="filterPayables(this,'Critical')">Critical</div>
+      <div class="filter-tab" onclick="filterPayables(this,'Important')">Important</div>
+      <div class="filter-tab" onclick="filterPayables(this,'Can Wait')">Can Wait</div>
+      <div class="filter-tab" onclick="filterPayables(this,'Paid')">Paid</div>
+    </div>
+    <div class="data-list scroll-pad" id="pay-list">
+      <div class="loader"><div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div></div>
+    </div>
+    <button class="fab" onclick="openModal('modal-pay')">＋</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: TRANSACTIONS
+  ════════════════════════════════════════ -->
+  <div class="page" id="page-money">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:50%;background:#1a6b3c;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">💰</div>
+        <div>
+          <h1>Transactions</h1>
+          <div style="font-size:0.65rem;color:rgba(233,237,239,0.55);margin-top:1px" id="tx-sub-label">Loading...</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span class="header-badge" id="tx-count-badge">0</span>
+        <div class="btn-icon">⋮</div>
+      </div>
+    </div>
+    <div class="filter-tabs">
+      <div class="filter-tab active" onclick="filterTransactions(this,'all')">All</div>
+      <div class="filter-tab" onclick="filterTransactions(this,'Income')">Income</div>
+      <div class="filter-tab" onclick="filterTransactions(this,'Expense')">Expenses</div>
+    </div>
+    <div class="data-list scroll-pad" id="tx-list">
+      <div class="loader"><div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div></div>
+    </div>
+    <button class="fab" onclick="openModal('modal-tx')">＋</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: QUICK ENTRY (MORE)
+  ════════════════════════════════════════ -->
+  <div class="page" id="page-more">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:50%;background:#5b3a8a;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">✏️</div>
+        <div>
+          <h1>Quick Entry</h1>
+          <div style="font-size:0.65rem;color:rgba(233,237,239,0.55);margin-top:1px">Tap to log anything fast</div>
+        </div>
+      </div>
+      <div class="header-badge" style="background:var(--wa-green)">AI</div>
+    </div>
+    <div class="quick-wrap">
+      <div class="quick-box">
+        <textarea class="quick-textarea" id="quick-input" placeholder="What happened?&#10;&#10;e.g. Amol owes 25000 by Friday"></textarea>
+        <div class="quick-examples">
+          <div class="quick-example" onclick="fillQuick(this)">Amol owes 25000 by Friday</div>
+          <div class="quick-example" onclick="fillQuick(this)">Need to pay Iqbal 20000</div>
+          <div class="quick-example" onclick="fillQuick(this)">Received 5000 from Visa Client</div>
+          <div class="quick-example" onclick="fillQuick(this)">Paid Fuel 800</div>
+        </div>
+        <button class="btn-primary" style="margin-top:14px" onclick="saveQuickEntry()">Save Entry</button>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Recent Entries</div>
+      </div>
+      <div class="quick-entries-list" id="quick-list">
+        <div class="loader"><div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       BOTTOM NAV
+  ════════════════════════════════════════ -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="navigate('home',this)">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" onclick="navigate('collect',this)">
+      <span class="nav-icon">📥</span>
+      <span class="nav-label">Collect</span>
+    </button>
+    <button class="nav-item" onclick="navigate('pay',this)">
+      <span class="nav-icon">📤</span>
+      <span class="nav-label">Pay</span>
+    </button>
+    <button class="nav-item" onclick="navigate('money',this)">
+      <span class="nav-icon">💰</span>
+      <span class="nav-label">Money</span>
+    </button>
+    <button class="nav-item" onclick="navigate('more',this)">
+      <span class="nav-icon">✏️</span>
+      <span class="nav-label">Quick</span>
+    </button>
+  </nav>
+
+  <!-- ═══════════════════════════════════════
+       MODALS
+  ════════════════════════════════════════ -->
+
+  <!-- Add Receivable -->
+  <div class="modal-overlay" id="modal-recv" onclick="closeModalOutside(event,'modal-recv')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="recv-modal-title">Add Receivable</div>
+      <input type="hidden" id="recv-edit-id">
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input class="form-input" id="recv-name" placeholder="Contact name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mobile</label>
+        <input class="form-input" id="recv-mobile" placeholder="Phone number" type="tel">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input class="form-input" id="recv-amount" placeholder="0" type="number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Due Date</label>
+          <input class="form-input" id="recv-due" type="date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="recv-status">
+          <option value="Expected">Expected</option>
+          <option value="Follow Up">Follow Up</option>
+          <option value="Promise To Pay">Promise To Pay</option>
+          <option value="Received">Received</option>
+          <option value="Overdue">Overdue</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="recv-notes" placeholder="Optional notes..." style="min-height:60px"></textarea>
+      </div>
+      <button class="btn-primary" onclick="saveReceivable()">Save Receivable</button>
+      <button class="btn-secondary" onclick="closeModal('modal-recv')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Add Payable -->
+  <div class="modal-overlay" id="modal-pay" onclick="closeModalOutside(event,'modal-pay')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="pay-modal-title">Add Payable</div>
+      <input type="hidden" id="pay-edit-id">
+      <div class="form-group">
+        <label class="form-label">Name / Vendor</label>
+        <input class="form-input" id="pay-name" placeholder="Who to pay">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input class="form-input" id="pay-amount" placeholder="0" type="number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Due Date</label>
+          <input class="form-input" id="pay-due" type="date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select class="form-select" id="pay-priority">
+          <option value="Critical">Critical</option>
+          <option value="Important">Important</option>
+          <option value="Can Wait">Can Wait</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="pay-status">
+          <option value="Pending">Pending</option>
+          <option value="Paid">Paid</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="pay-notes" placeholder="Optional notes..." style="min-height:60px"></textarea>
+      </div>
+      <button class="btn-primary" onclick="savePayable()">Save Payable</button>
+      <button class="btn-secondary" onclick="closeModal('modal-pay')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Add Transaction -->
+  <div class="modal-overlay" id="modal-tx" onclick="closeModalOutside(event,'modal-tx')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="tx-modal-title">Add Transaction</div>
+      <input type="hidden" id="tx-edit-id">
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="tx-type" onchange="updateTxCategories()">
+          <option value="Income">Income</option>
+          <option value="Expense">Expense</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="tx-category"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input class="form-input" id="tx-amount" placeholder="0" type="number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input class="form-input" id="tx-date" type="date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input class="form-input" id="tx-desc" placeholder="Brief description">
+      </div>
+      <button class="btn-primary" onclick="saveTransaction()">Save Transaction</button>
+      <button class="btn-secondary" onclick="closeModal('modal-tx')">Cancel</button>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+/* ════════════════════════════════════════════════
+   VCFO — Main Application Script
+════════════════════════════════════════════════ */
+
+// ── Supabase Setup ────────────────────────────
+let sb = null; // Supabase client (named 'sb' to avoid shadowing window.supabase)
+let SUPABASE_URL = 'https://xlvpbjjylxkbldeebyed.supabase.co';
+let SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsdnBiamp5bHhrYmxkZWVieWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTg2NzQsImV4cCI6MjA5NjA3NDY3NH0.5vZLXt4Zo3_iJuhm6tcVAyyyuyVE0A535CC-_1WP_bU';
+
+function initSupabase() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return false;
+  try {
+    // The CDN exposes the library as window.supabase with a createClient method
+    const lib = window.supabase || window.supabaseJs;
+    if (!lib || typeof lib.createClient !== 'function') {
+      console.error('Supabase library not loaded');
+      return false;
+    }
+    sb = lib.createClient(SUPABASE_URL, SUPABASE_KEY);
+    document.getElementById('config-banner').style.display = 'none';
+    return true;
+  } catch(e) {
+    console.error('Supabase init failed', e);
+    return false;
+  }
+}
+
+async function saveSupabaseConfig() {
+  const urlVal = document.getElementById('cfg-url').value.trim();
+  const keyVal = document.getElementById('cfg-key').value.trim();
+  if (!urlVal || !keyVal) { showToast('Please enter both URL and key', 'error'); return; }
+  SUPABASE_URL = urlVal;
+  SUPABASE_KEY = keyVal;
+
+  const btn = document.querySelector('.config-save');
+  btn.textContent = 'Connecting…';
+  btn.disabled = true;
+
+  localStorage.setItem('vcfo_url', SUPABASE_URL);
+  localStorage.setItem('vcfo_key', SUPABASE_KEY);
+
+  if (initSupabase()) {
+    // Quick connectivity test
+    try {
+      await sb.from('receivables').select('id').limit(1);
+      showToast('Connected to Supabase ✓', 'success');
+      await loadAll();
+    } catch(e) {
+      // Tables may not exist yet — still connected, just show warning
+      showToast('Connected — create tables to load data', 'success');
+      await loadAll();
+    }
+  } else {
+    btn.textContent = 'Connect →';
+    btn.disabled = false;
+    showToast('Connection failed — check credentials', 'error');
+  }
+}
+
+// ── Local State ───────────────────────────────
+let receivables = [];
+let payables    = [];
+let transactions = [];
+let quickEntries = [];
+let recvFilter = 'all';
+let payFilter  = 'all';
+let txFilter   = 'all';
+
+// ── Navigation ────────────────────────────────
+function navigate(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  el.classList.add('active');
+  // Lazy-load on tab switch
+  if (page === 'home')    refreshDashboard();
+  if (page === 'collect') renderReceivables();
+  if (page === 'pay')     renderPayables();
+  if (page === 'money')   renderTransactions();
+  if (page === 'more')    renderQuickEntries();
+}
+
+// ── Toast ─────────────────────────────────────
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── Modal helpers ─────────────────────────────
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function closeModalOutside(e, id) {
+  if (e.target.classList.contains('modal-overlay')) closeModal(id);
+}
+
+// ── Format helpers ────────────────────────────
+function fmt(n) {
+  const num = Number(n) || 0;
+  if (num >= 100000) return '₹' + (num/100000).toFixed(1) + 'L';
+  if (num >= 1000)   return '₹' + (num/1000).toFixed(1) + 'k';
+  return '₹' + num.toLocaleString('en-IN');
+}
+function fmtFull(n) {
+  return '₹' + (Number(n)||0).toLocaleString('en-IN');
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'});
+}
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+}
+function isOverdue(due) {
+  if (!due) return false;
+  return new Date(due) < new Date(new Date().toDateString());
+}
+function daysLeft(due) {
+  if (!due) return null;
+  const diff = Math.ceil((new Date(due) - new Date(new Date().toDateString())) / 86400000);
+  if (diff < 0) return diff + 'd overdue';
+  if (diff === 0) return 'Today';
+  return 'in ' + diff + 'd';
+}
+
+// ── Load All ──────────────────────────────────
+async function loadAll() {
+  await Promise.all([
+    loadReceivables(),
+    loadPayables(),
+    loadTransactions(),
+    loadQuickEntries()
+  ]);
+  refreshDashboard();
+}
+
+// ── Receivables ───────────────────────────────
+async function loadReceivables() {
+  if (!sb) { receivables = []; renderReceivables(); return; }
+  try {
+    const { data, error } = await sb.from('receivables').select('*').order('due_date', {ascending:true});
+    if (error) throw error;
+    receivables = data || [];
+  } catch(e) {
+    console.error(e);
+    receivables = getSampleReceivables();
+    showToast('Using demo data (receivables)', '');
+  }
+  renderReceivables();
+}
+
+function getSampleReceivables() {
+  const today = new Date();
+  const add = (d) => { const dt = new Date(today); dt.setDate(dt.getDate()+d); return dt.toISOString().split('T')[0]; };
+  return [
+    { id:1, name:'Amol Sharma', mobile:'9876543210', amount:25000, due_date:add(3), status:'Promise To Pay', notes:'' },
+    { id:2, name:'Visa Client', mobile:'9123456780', amount:85000, due_date:add(-2), status:'Overdue', notes:'Invoice #1042' },
+    { id:3, name:'Raj Mehta',   mobile:'9988776655', amount:12000, due_date:add(7), status:'Expected', notes:'' },
+    { id:4, name:'Swiggy Payout', mobile:'', amount:4500, due_date:add(5), status:'Expected', notes:'Monthly settlement' },
+    { id:5, name:'Deepa Nair',  mobile:'9011223344', amount:18000, due_date:add(1), status:'Follow Up', notes:'' },
+  ];
+}
+
+function filterReceivables(el, f) {
+  recvFilter = f;
+  document.querySelectorAll('#recv-filters .filter-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderReceivables();
+}
+
+function renderReceivables() {
+  const list = document.getElementById('recv-list');
+  let data = receivables;
+  // Auto-mark overdue
+  data = data.map(r => ({...r, status: (r.status !== 'Received' && isOverdue(r.due_date)) ? 'Overdue' : r.status }));
+  if (recvFilter !== 'all') data = data.filter(r => r.status === recvFilter);
+
+  document.getElementById('recv-count-badge').textContent = receivables.filter(r=>r.status!=='Received').length;
+  const rsl = document.getElementById('recv-sub-label');
+  if(rsl) rsl.textContent = receivables.length + ' contacts · ₹' + (receivables.filter(r=>r.status!=='Received').reduce((s,r)=>s+Number(r.amount),0)).toLocaleString('en-IN') + ' pending';
+
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-text">No receivables found</div></div>`;
+    return;
+  }
+
+  list.innerHTML = data.map(r => {
+    const badgeClass = {
+      'Expected':'badge-expected','Follow Up':'badge-followup','Promise To Pay':'badge-promise',
+      'Received':'badge-received','Overdue':'badge-overdue'
+    }[r.status] || 'badge-expected';
+    const avatarClass = r.status==='Received' ? 'avatar-green' : r.status==='Overdue' ? 'avatar-red' : 'avatar-amber';
+    const dl = daysLeft(r.due_date);
+    return `
+    <div class="data-item" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="data-item-avatar ${avatarClass}">${initials(r.name)}</div>
+        <div class="data-item-body">
+          <div class="data-item-name">${r.name}</div>
+          <div class="data-item-sub">${r.mobile || 'No mobile'} · <span class="badge ${badgeClass}">${r.status}</span></div>
+        </div>
+        <div class="data-item-right">
+          <div class="data-item-amount" style="color:var(--green)">${fmt(r.amount)}</div>
+          <div class="data-item-due">${dl||fmtDate(r.due_date)}</div>
+        </div>
+      </div>
+      <div class="item-actions">
+        <button class="btn-xs" onclick="editReceivable(${r.id})">Edit</button>
+        <button class="btn-xs danger" onclick="deleteReceivable(${r.id})">Delete</button>
+        ${r.status!=='Received'?`<button class="btn-xs success" onclick="markReceived(${r.id})">✓ Received</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function saveReceivable() {
+  const editId = document.getElementById('recv-edit-id').value;
+  const data = {
+    name:     document.getElementById('recv-name').value.trim(),
+    mobile:   document.getElementById('recv-mobile').value.trim(),
+    amount:   parseFloat(document.getElementById('recv-amount').value)||0,
+    due_date: document.getElementById('recv-due').value,
+    status:   document.getElementById('recv-status').value,
+    notes:    document.getElementById('recv-notes').value.trim(),
+  };
+  if (!data.name || !data.amount) { showToast('Name and amount required', 'error'); return; }
+
+  if (sb) {
+    try {
+      if (editId) {
+        await sb.from('receivables').update(data).eq('id', editId);
+      } else {
+        await sb.from('receivables').insert([data]);
+      }
+    } catch(e) { console.error(e); }
+  } else {
+    if (editId) {
+      const idx = receivables.findIndex(r=>r.id==editId);
+      if(idx>-1) receivables[idx] = {...receivables[idx],...data};
+    } else {
+      receivables.push({...data, id: Date.now()});
+    }
+  }
+  closeModal('modal-recv');
+  clearRecvForm();
+  await loadReceivables();
+  refreshDashboard();
+  showToast(editId ? 'Receivable updated' : 'Receivable added ✓', 'success');
+}
+
+async function markReceived(id) {
+  if (sb) {
+    await sb.from('receivables').update({status:'Received'}).eq('id',id);
+  } else {
+    const r = receivables.find(x=>x.id==id);
+    if(r) r.status='Received';
+  }
+  await loadReceivables();
+  refreshDashboard();
+  showToast('Marked as Received ✓', 'success');
+}
+
+async function deleteReceivable(id) {
+  if (!confirm('Delete this receivable?')) return;
+  if (sb) {
+    await sb.from('receivables').delete().eq('id',id);
+  } else {
+    receivables = receivables.filter(r=>r.id!=id);
+  }
+  await loadReceivables();
+  refreshDashboard();
+  showToast('Deleted', '');
+}
+
+function editReceivable(id) {
+  const r = receivables.find(x=>x.id==id);
+  if (!r) return;
+  document.getElementById('recv-edit-id').value = r.id;
+  document.getElementById('recv-name').value = r.name||'';
+  document.getElementById('recv-mobile').value = r.mobile||'';
+  document.getElementById('recv-amount').value = r.amount||'';
+  document.getElementById('recv-due').value = r.due_date||'';
+  document.getElementById('recv-status').value = r.status||'Expected';
+  document.getElementById('recv-notes').value = r.notes||'';
+  document.getElementById('recv-modal-title').textContent = 'Edit Receivable';
+  openModal('modal-recv');
+}
+
+function clearRecvForm() {
+  ['recv-edit-id','recv-name','recv-mobile','recv-amount','recv-due','recv-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('recv-status').value='Expected';
+  document.getElementById('recv-modal-title').textContent='Add Receivable';
+}
+
+// ── Payables ──────────────────────────────────
+async function loadPayables() {
+  if (!sb) { payables = []; renderPayables(); return; }
+  try {
+    const { data, error } = await sb.from('payables').select('*').order('due_date', {ascending:true});
+    if (error) throw error;
+    payables = data || [];
+  } catch(e) {
+    payables = getSamplePayables();
+  }
+  renderPayables();
+}
+
+function getSamplePayables() {
+  const today = new Date();
+  const add = (d) => { const dt = new Date(today); dt.setDate(dt.getDate()+d); return dt.toISOString().split('T')[0]; };
+  return [
+    { id:1, name:'Office Rent',    amount:35000, due_date:add(2),  priority:'Critical',  status:'Pending', notes:'' },
+    { id:2, name:'Iqbal',          amount:20000, due_date:add(5),  priority:'Important', status:'Pending', notes:'Freelancer fee' },
+    { id:3, name:'Electricity Bill', amount:4200, due_date:add(10), priority:'Important', status:'Pending', notes:'' },
+    { id:4, name:'Software Subs',  amount:2999,  due_date:add(15), priority:'Can Wait',  status:'Pending', notes:'' },
+    { id:5, name:'Vehicle EMI',    amount:8500,  due_date:add(-1), priority:'Critical',  status:'Pending', notes:'' },
+  ];
+}
+
+function filterPayables(el, f) {
+  payFilter = f;
+  el.closest('.filter-tabs').querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderPayables();
+}
+
+function renderPayables() {
+  const list = document.getElementById('pay-list');
+  let data = payables;
+  if (payFilter === 'Paid') data = data.filter(p=>p.status==='Paid');
+  else if (payFilter !== 'all') data = data.filter(p=>p.priority===payFilter && p.status!=='Paid');
+
+  document.getElementById('pay-count-badge').textContent = payables.filter(p=>p.status!=='Paid').length;
+  const psl = document.getElementById('pay-sub-label');
+  if(psl) psl.textContent = payables.length + ' vendors · ₹' + (payables.filter(p=>p.status!=='Paid').reduce((s,p)=>s+Number(p.amount),0)).toLocaleString('en-IN') + ' due';
+
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-text">No payables found</div></div>`;
+    return;
+  }
+
+  list.innerHTML = data.map(p => {
+    const priClass = {'Critical':'badge-critical','Important':'badge-important','Can Wait':'badge-canwait'}[p.priority]||'badge-canwait';
+    const stClass  = p.status==='Paid'?'badge-paid':'badge-overdue';
+    const avatarC  = p.priority==='Critical'?'avatar-red':p.priority==='Important'?'avatar-amber':'avatar-blue';
+    const dl = daysLeft(p.due_date);
+    return `
+    <div class="data-item" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="data-item-avatar ${avatarC}">${initials(p.name)}</div>
+        <div class="data-item-body">
+          <div class="data-item-name">${p.name}</div>
+          <div class="data-item-sub"><span class="badge ${priClass}">${p.priority}</span> · <span class="badge ${stClass}">${p.status}</span></div>
+        </div>
+        <div class="data-item-right">
+          <div class="data-item-amount" style="color:var(--red)">${fmt(p.amount)}</div>
+          <div class="data-item-due">${dl||fmtDate(p.due_date)}</div>
+        </div>
+      </div>
+      <div class="item-actions">
+        <button class="btn-xs" onclick="editPayable(${p.id})">Edit</button>
+        <button class="btn-xs danger" onclick="deletePayable(${p.id})">Delete</button>
+        ${p.status!=='Paid'?`<button class="btn-xs success" onclick="markPaid(${p.id})">✓ Mark Paid</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function savePayable() {
+  const editId = document.getElementById('pay-edit-id').value;
+  const data = {
+    name:     document.getElementById('pay-name').value.trim(),
+    amount:   parseFloat(document.getElementById('pay-amount').value)||0,
+    due_date: document.getElementById('pay-due').value,
+    priority: document.getElementById('pay-priority').value,
+    status:   document.getElementById('pay-status').value,
+    notes:    document.getElementById('pay-notes').value.trim(),
+  };
+  if (!data.name || !data.amount) { showToast('Name and amount required', 'error'); return; }
+
+  if (sb) {
+    if (editId) await sb.from('payables').update(data).eq('id',editId);
+    else await sb.from('payables').insert([data]);
+  } else {
+    if (editId) {
+      const idx = payables.findIndex(p=>p.id==editId);
+      if(idx>-1) payables[idx]={...payables[idx],...data};
+    } else {
+      payables.push({...data, id:Date.now()});
+    }
+  }
+  closeModal('modal-pay');
+  clearPayForm();
+  await loadPayables();
+  refreshDashboard();
+  showToast(editId?'Payable updated':'Payable added ✓','success');
+}
+
+async function markPaid(id) {
+  if (sb) {
+    await sb.from('payables').update({status:'Paid'}).eq('id',id);
+  } else {
+    const p = payables.find(x=>x.id==id);
+    if(p) p.status='Paid';
+  }
+  await loadPayables();
+  refreshDashboard();
+  showToast('Marked as Paid ✓','success');
+}
+
+async function deletePayable(id) {
+  if (!confirm('Delete this payable?')) return;
+  if (sb) await sb.from('payables').delete().eq('id',id);
+  else payables = payables.filter(p=>p.id!=id);
+  await loadPayables();
+  refreshDashboard();
+  showToast('Deleted','');
+}
+
+function editPayable(id) {
+  const p = payables.find(x=>x.id==id);
+  if (!p) return;
+  document.getElementById('pay-edit-id').value = p.id;
+  document.getElementById('pay-name').value     = p.name||'';
+  document.getElementById('pay-amount').value   = p.amount||'';
+  document.getElementById('pay-due').value      = p.due_date||'';
+  document.getElementById('pay-priority').value = p.priority||'Important';
+  document.getElementById('pay-status').value   = p.status||'Pending';
+  document.getElementById('pay-notes').value    = p.notes||'';
+  document.getElementById('pay-modal-title').textContent = 'Edit Payable';
+  openModal('modal-pay');
+}
+
+function clearPayForm() {
+  ['pay-edit-id','pay-name','pay-amount','pay-due','pay-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pay-priority').value='Important';
+  document.getElementById('pay-status').value='Pending';
+  document.getElementById('pay-modal-title').textContent='Add Payable';
+}
+
+// ── Transactions ──────────────────────────────
+const INCOME_CATS  = ['Salary','Swiggy','Visa Client','Commission','Other'];
+const EXPENSE_CATS = ['Rent','Fuel','Food','Baby','Medical','Bills','Family','Other'];
+const CAT_ICONS = {
+  Salary:'💼', Swiggy:'🛵', 'Visa Client':'💳', Commission:'🤝', Other:'◈',
+  Rent:'🏢', Fuel:'⛽', Food:'🍱', Baby:'👶', Medical:'💊', Bills:'📋', Family:'👨‍👩‍👧', 
+};
+
+function updateTxCategories() {
+  const type = document.getElementById('tx-type').value;
+  const cats = type==='Income' ? INCOME_CATS : EXPENSE_CATS;
+  const sel = document.getElementById('tx-category');
+  sel.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+async function loadTransactions() {
+  if (!sb) { transactions = [];; renderTransactions(); return; }
+  try {
+    const { data, error } = await sb.from('transactions').select('*').order('date', {ascending:false});
+    if (error) throw error;
+    transactions = data || [];
+  } catch(e) {
+    transactions = [];
+  }
+  renderTransactions();
+}
+
+function getSampleTransactions() {
+  const today = new Date();
+  const sub = (d) => { const dt=new Date(today); dt.setDate(dt.getDate()-d); return dt.toISOString().split('T')[0]; };
+  return [
+    { id:1, type:'Income',  category:'Salary',      amount:75000, date:sub(0),  description:'June salary' },
+    { id:2, type:'Income',  category:'Visa Client',  amount:45000, date:sub(1),  description:'Project milestone' },
+    { id:3, type:'Expense', category:'Rent',         amount:35000, date:sub(2),  description:'Office rent' },
+    { id:4, type:'Expense', category:'Fuel',         amount:3500,  date:sub(3),  description:'Vehicle fuel' },
+    { id:5, type:'Income',  category:'Swiggy',       amount:8200,  date:sub(4),  description:'Weekly payout' },
+    { id:6, type:'Expense', category:'Food',         amount:4200,  date:sub(5),  description:'Team lunch' },
+    { id:7, type:'Expense', category:'Bills',        amount:2800,  date:sub(6),  description:'Internet + phone' },
+    { id:8, type:'Income',  category:'Commission',   amount:12000, date:sub(7),  description:'Referral fee' },
+  ];
+}
+
+function filterTransactions(el, f) {
+  txFilter = f;
+  el.closest('.filter-tabs').querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderTransactions();
+}
+
+function renderTransactions() {
+  const list = document.getElementById('tx-list');
+  let data = transactions;
+  if (txFilter !== 'all') data = data.filter(t=>t.type===txFilter);
+  document.getElementById('tx-count-badge').textContent = transactions.length;
+  const tsl = document.getElementById('tx-sub-label');
+  if(tsl) {
+    const inc = transactions.filter(t=>t.type==='Income').reduce((s,t)=>s+Number(t.amount),0);
+    const exp = transactions.filter(t=>t.type==='Expense').reduce((s,t)=>s+Number(t.amount),0);
+    tsl.textContent = transactions.length + ' entries · Net ₹' + (inc-exp).toLocaleString('en-IN');
+  }
+
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">⇄</div><div class="empty-text">No transactions found</div></div>`;
+    return;
+  }
+
+  list.innerHTML = data.map(t => {
+    const isIncome = t.type==='Income';
+    const icon = CAT_ICONS[t.category]||'◈';
+    const bg = isIncome ? 'background:var(--green-glow)' : 'background:var(--red-glow)';
+    return `
+    <div class="tx-item">
+      <div class="tx-icon" style="${bg}">${icon}</div>
+      <div class="tx-body">
+        <div class="tx-cat">${t.category}</div>
+        <div class="tx-desc">${t.description||'—'}</div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amount" style="color:${isIncome?'var(--green)':'var(--red)'}">
+          ${isIncome?'+':'−'}${fmt(t.amount)}
+        </div>
+        <div class="tx-date">${fmtDate(t.date)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function saveTransaction() {
+  const editId = document.getElementById('tx-edit-id').value;
+  const data = {
+    type:        document.getElementById('tx-type').value,
+    category:    document.getElementById('tx-category').value,
+    amount:      parseFloat(document.getElementById('tx-amount').value)||0,
+    date:        document.getElementById('tx-date').value,
+    description: document.getElementById('tx-desc').value.trim(),
+  };
+  if (!data.amount) { showToast('Amount required','error'); return; }
+
+  if (sb) {
+    if (editId) await sb.from('transactions').update(data).eq('id',editId);
+    else await sb.from('transactions').insert([data]);
+  } else {
+    if (editId) {
+      const idx = transactions.findIndex(t=>t.id==editId);
+      if(idx>-1) transactions[idx]={...transactions[idx],...data};
+    } else {
+      transactions.unshift({...data, id:Date.now()});
+    }
+  }
+  closeModal('modal-tx');
+  clearTxForm();
+  await loadTransactions();
+  refreshDashboard();
+  showToast(editId?'Transaction updated':'Transaction added ✓','success');
+}
+
+function clearTxForm() {
+  ['tx-edit-id','tx-amount','tx-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-type').value = 'Income';
+  updateTxCategories();
+  document.getElementById('tx-modal-title').textContent = 'Add Transaction';
+}
+
+// ── Quick Entries ─────────────────────────────
+async function loadQuickEntries() {
+  if (!sb) { quickEntries = []; renderQuickEntries(); return; }
+  try {
+    const { data, error } = await sb.from('quick_entries').select('*').order('created_at',{ascending:false}).limit(20);
+    if (error) throw error;
+    quickEntries = data || [];
+  } catch(e) {
+    quickEntries = [];
+  }
+  renderQuickEntries();
+}
+
+async function saveQuickEntry() {
+  const text = document.getElementById('quick-input').value.trim();
+  if (!text) { showToast('Type something first','error'); return; }
+  const entry = { raw_text: text, created_at: new Date().toISOString() };
+
+  if (sb) {
+    try {
+      const { error } = await sb.from('quick_entries').insert([entry]);
+      if (error) throw error;
+    } catch(e) {
+      quickEntries.unshift({...entry, id:Date.now()});
+    }
+  } else {
+    quickEntries.unshift({...entry, id:Date.now()});
+  }
+  document.getElementById('quick-input').value = '';
+  await loadQuickEntries();
+  showToast('Entry saved ✓','success');
+}
+
+function renderQuickEntries() {
+  const list = document.getElementById('quick-list');
+  if (!quickEntries.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">✦</div><div class="empty-text">No quick entries yet.<br>Use the box above to log anything.</div></div>`;
+    return;
+  }
+  list.innerHTML = quickEntries.map(q => `
+    <div class="qe-item">
+      <div class="qe-text">${q.raw_text}</div>
+      <div class="qe-meta">${q.created_at ? new Date(q.created_at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+    </div>
+  `).join('');
+}
+
+function fillQuick(el) {
+  const t = el.textContent.replace(/^→ /,'');
+  document.getElementById('quick-input').value = t;
+  document.getElementById('quick-input').focus();
+}
+
+// ── Dashboard ─────────────────────────────────
+function refreshDashboard() {
+  // Totals
+  const totalIncome   = transactions.filter(t=>t.type==='Income').reduce((s,t)=>s+Number(t.amount),0);
+  const totalExpenses = transactions.filter(t=>t.type==='Expense').reduce((s,t)=>s+Number(t.amount),0);
+  const cashAvailable = totalIncome - totalExpenses;
+
+  const moneyToReceive = receivables
+    .filter(r=>r.status!=='Received')
+    .reduce((s,r)=>s+Number(r.amount),0);
+
+  const moneyToPay = payables
+    .filter(p=>p.status!=='Paid')
+    .reduce((s,p)=>s+Number(p.amount),0);
+
+  const netPosition = cashAvailable + moneyToReceive - moneyToPay;
+
+  // Update KPIs
+  document.getElementById('kpi-cash').textContent   = fmt(cashAvailable);
+  document.getElementById('kpi-recv').textContent   = fmt(moneyToReceive);
+  document.getElementById('kpi-pay').textContent    = fmt(moneyToPay);
+  document.getElementById('kpi-income').textContent = fmt(totalIncome);
+  document.getElementById('net-amount').textContent = fmt(netPosition);
+
+  // Net position color
+  const netEl = document.getElementById('net-amount');
+  netEl.style.color = netPosition >= 0 ? 'var(--amber)' : 'var(--red)';
+
+  // Health score
+  let health = 50;
+  if (totalIncome > 0) {
+    const ratio = cashAvailable / totalIncome;
+    if (ratio > 0.4) health = 90;
+    else if (ratio > 0.2) health = 70;
+    else if (ratio > 0) health = 50;
+    else health = 20;
+  }
+  const overdueCount = receivables.filter(r=>r.status==='Overdue').length;
+  const criticalPay  = payables.filter(p=>p.priority==='Critical'&&p.status!=='Paid').length;
+  if (overdueCount > 0) health -= overdueCount * 10;
+  if (criticalPay > 0)  health -= criticalPay * 8;
+  health = Math.max(5, Math.min(100, health));
+
+  const hfill = document.getElementById('health-fill');
+  const htext = document.getElementById('health-status-text');
+  hfill.style.width = health + '%';
+  if (health >= 75) {
+    hfill.style.background = 'var(--green)';
+    htext.style.color = 'var(--green)';
+    htext.textContent = 'Strong';
+  } else if (health >= 50) {
+    hfill.style.background = 'var(--amber)';
+    htext.style.color = 'var(--amber)';
+    htext.textContent = 'Moderate';
+  } else {
+    hfill.style.background = 'var(--red)';
+    htext.style.color = 'var(--red)';
+    htext.textContent = 'At Risk';
+  }
+
+  // AI card
+  const pendingRecv = receivables
+    .filter(r=>r.status!=='Received')
+    .sort((a,b)=>Number(b.amount)-Number(a.amount));
+  const urgentPay = payables
+    .filter(p=>p.status!=='Paid')
+    .sort((a,b)=>{
+      const pri = {Critical:0,Important:1,'Can Wait':2};
+      return (pri[a.priority]??3)-(pri[b.priority]??3) || new Date(a.due_date)-new Date(b.due_date);
+    });
+
+  document.getElementById('ai-collect').textContent = pendingRecv[0] ? `${pendingRecv[0].name} · ${fmt(pendingRecv[0].amount)}` : 'None pending';
+  document.getElementById('ai-pay').textContent     = urgentPay[0]   ? `${urgentPay[0].name} · ${fmt(urgentPay[0].amount)}`   : 'None pending';
+
+  let aiMsg = '';
+  if (netPosition < 0) {
+    aiMsg = `⚠ Net position is <strong>negative ${fmt(Math.abs(netPosition))}</strong>. Prioritize collecting from ${pendingRecv[0]?.name||'debtors'} immediately.`;
+  } else if (criticalPay > 0) {
+    aiMsg = `You have <strong>${criticalPay} critical payment${criticalPay>1?'s':''}</strong> pending. Clear these before new commitments. Net position is ${fmt(netPosition)}.`;
+  } else if (overdueCount > 0) {
+    aiMsg = `<strong>${overdueCount} receivable${overdueCount>1?'s are':' is'} overdue</strong>. Follow up immediately to protect cash flow. Current cash: ${fmt(cashAvailable)}.`;
+  } else if (health >= 75) {
+    aiMsg = `Financial position looks <strong>healthy</strong>. Cash available: ${fmt(cashAvailable)}. Consider early payments for better vendor relations.`;
+  } else {
+    aiMsg = `Monitor cash flow closely. Net position: <strong>${fmt(netPosition)}</strong>. ${moneyToReceive>0?`Expected to receive ${fmt(moneyToReceive)}.`:''}`;
+  }
+  document.getElementById('ai-text').innerHTML = aiMsg;
+
+  // Recent activity
+  const activityEl = document.getElementById('activity-list');
+  const recentTx = [...transactions].slice(0,5);
+  if (!recentTx.length) {
+    activityEl.innerHTML = `<div class="empty-state" style="padding:16px"><div class="empty-text">No recent activity</div></div>`;
+    return;
+  }
+  activityEl.innerHTML = recentTx.map(t => `
+    <div class="activity-item">
+      <div class="activity-dot" style="background:${t.type==='Income'?'var(--green)':'var(--red)'}"></div>
+      <div class="activity-text">${t.category} · ${t.description||''}</div>
+      <div class="activity-time" style="color:${t.type==='Income'?'var(--green)':'var(--red)'}">
+        ${t.type==='Income'?'+':'-'}${fmt(t.amount)}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Init ──────────────────────────────────────
+function setTodayDates() {
+  const today = new Date().toISOString().split('T')[0];
+  ['recv-due','pay-due','tx-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = today;
+  });
+}
+
+function setDashDate() {
+  const d = new Date();
+  document.getElementById('dash-date').textContent = d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+
+// Boot — runs after DOM is ready
+async function boot() {
+  setDashDate();
+  updateTxCategories();
+  setTodayDates();
+
+  // Pre-fill saved credentials into inputs
+  if (SUPABASE_URL) document.getElementById('cfg-url').value = SUPABASE_URL;
+  if (SUPABASE_KEY) document.getElementById('cfg-key').value = SUPABASE_KEY;
+
+  // Try to auto-connect if credentials are saved
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    initSupabase();
+  }
+
+  await loadAll();
+
+  // Set today's date whenever a modal opens
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', () => setTodayDates());
+  });
+}
+
+// Wait for full page load so Supabase CDN script is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+</script>
+</body>
+</html>
