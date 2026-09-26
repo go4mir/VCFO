@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MigrateOS CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+  --bg-deep:     #0b141a;
+  --bg-base:     #111b21;
+  --bg-card:     #202c33;
+  --bg-card2:    #2a3942;
+  --bg-elevated: #2a3942;
+  --border:      #2a3942;
+  --border-glow: #3d5a66;
+
+  --wa-green:      #00a884;
+  --wa-green-dark: #008069;
+  --wa-green-light:#25d366;
+  --wa-green-glow: rgba(0,168,132,0.15);
+  --wa-teal-header:#1f2c34;
+
+  --amber:       #ffd279;
+  --amber-glow:  rgba(255,210,121,0.12);
+  --blue:        #53bdeb;
+  --blue-glow:   rgba(83,189,235,0.12);
+  --red:         #ff6b6b;
+  --red-glow:    rgba(255,107,107,0.12);
+  --purple:      #c8a4e0;
+  --purple-glow: rgba(200,164,224,0.12);
+
+  --text-primary:   #e9edef;
+  --text-secondary: #8696a0;
+  --text-muted:     #3d5a66;
+
+  --font-display: 'Nunito', sans-serif;
+  --font-mono:    'Inter', sans-serif;
+
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  18px;
+  --nav-height: 60px;
+  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app, #auth-screen { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; }
+
+/* ── Auth screen ─────────────────────────── */
+#auth-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px;
+  min-height: 100vh;
+}
+.auth-logo { text-align: center; margin-bottom: 32px; }
+.auth-logo .mark {
+  width: 64px; height: 64px; border-radius: 18px;
+  background: var(--wa-green); display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; margin: 0 auto 14px;
+}
+.auth-logo h1 { font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; }
+.auth-logo p { color: var(--text-secondary); font-size: 0.8rem; margin-top: 4px; }
+
+.auth-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 22px; border: 1px solid var(--border); }
+.form-label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; display: block; }
+.form-input, .form-select, textarea.form-input {
+  width: 100%; background: var(--bg-card2); border: 1px solid var(--border);
+  color: var(--text-primary); border-radius: var(--radius-sm); padding: 11px 12px;
+  font-size: 0.88rem; font-family: var(--font-mono); margin-bottom: 14px;
+}
+.form-input:focus, .form-select:focus { outline: none; border-color: var(--wa-green); }
+.btn-primary {
+  width: 100%; background: var(--wa-green); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 13px; font-size: 0.92rem; font-weight: 700;
+  cursor: pointer; transition: var(--transition); font-family: var(--font-mono);
+}
+.btn-primary:hover { background: var(--wa-green-dark); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-error { background: var(--red-glow); color: var(--red); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 0.8rem; margin-bottom: 14px; display: none; }
+
+/* ── App shell ───────────────────────────── */
+#app { display: none; padding-bottom: calc(var(--nav-height) + 16px); }
+.page { display: none; animation: pageIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.page-header {
+  position: sticky; top: 0; z-index: 100; background: var(--wa-teal-header);
+  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.page-header h1 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; }
+.page-header .sub { font-size: 0.68rem; color: var(--text-secondary); }
+.btn-icon {
+  width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; cursor: pointer; transition: var(--transition); font-size: 1rem;
+  background: transparent; border: none; color: var(--text-primary);
+}
+.btn-icon:hover { background: rgba(255,255,255,0.08); }
+
+.content { padding: 14px 16px; }
+
+/* Search + filters */
+.search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.search-row input { flex: 1; }
+.chip-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+.chip {
+  flex-shrink: 0; padding: 7px 14px; border-radius: 20px; font-size: 0.76rem; font-weight: 600;
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer;
+  white-space: nowrap;
+}
+.chip.active { background: var(--wa-green); border-color: var(--wa-green); color: #fff; }
+
+/* Contact card */
+.contact-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 14px; margin-bottom: 10px; cursor: pointer; transition: var(--transition);
+}
+.contact-card:hover { border-color: var(--border-glow); }
+.contact-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.contact-name { font-weight: 700; font-size: 0.95rem; }
+.contact-meta { color: var(--text-secondary); font-size: 0.76rem; margin-top: 3px; }
+.status-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 4px 9px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+}
+.status-inquiry { background: var(--blue-glow); color: var(--blue); }
+.status-documentation { background: var(--amber-glow); color: var(--amber); }
+.status-filed { background: var(--purple-glow); color: var(--purple); }
+.status-approved { background: var(--wa-green-glow); color: var(--wa-green-light); }
+.status-rejected { background: var(--red-glow); color: var(--red); }
+.contact-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.tag { font-size: 0.68rem; background: var(--bg-card2); color: var(--text-secondary); padding: 3px 8px; border-radius: 6px; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); font-size: 0.85rem; }
+
+/* FAB */
+.fab {
+  position: fixed; bottom: calc(var(--nav-height) + 20px); right: calc(50% - 240px + 20px);
+  width: 54px; height: 54px; border-radius: 50%; background: var(--wa-green); color: #fff;
+  border: none; font-size: 1.6rem; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 4px 14px rgba(0,168,132,0.4); z-index: 90;
+}
+@media (max-width: 519px) { .fab { right: 20px; } }
+
+/* Bottom nav */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px;
+  height: var(--nav-height); background: var(--wa-teal-header); display: flex; z-index: 100;
+  border-top: 1px solid var(--border);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; color: var(--text-secondary); font-size: 0.65rem; font-weight: 600; cursor: pointer;
+  background: none; border: none; font-family: var(--font-mono);
+}
+.nav-item.active { color: var(--wa-green-light); }
+.nav-item .ic { font-size: 1.15rem; }
+
+/* Modal / sheet */
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200;
+  align-items: flex-end; justify-content: center;
+}
+.overlay.active { display: flex; }
+.sheet {
+  background: var(--bg-base); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+  border-radius: 20px 20px 0 0; padding: 20px; animation: sheetIn 0.25s ease;
+}
+@keyframes sheetIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.sheet-head h2 { font-family: var(--font-display); font-size: 1.05rem; }
+
+/* Detail view */
+.detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.detail-name { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; }
+.detail-row { display: flex; gap: 10px; color: var(--text-secondary); font-size: 0.82rem; margin-top: 4px; }
+.section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 18px 0 8px; }
+.note-item, .task-item {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 12px; margin-bottom: 8px; font-size: 0.83rem;
+}
+.note-meta { color: var(--text-muted); font-size: 0.68rem; margin-top: 6px; }
+.task-item { display: flex; align-items: flex-start; gap: 10px; }
+.task-item input[type=checkbox] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--wa-green); }
+.task-item.done .task-title { text-decoration: line-through; color: var(--text-muted); }
+.task-due { font-size: 0.68rem; color: var(--text-secondary); margin-top: 2px; }
+.task-due.overdue { color: var(--red); }
+.inline-add { display: flex; gap: 8px; margin-top: 8px; }
+.inline-add input { flex: 1; margin-bottom: 0; }
+.inline-add button {
+  background: var(--wa-green); color: #fff; border: none; border-radius: var(--radius-sm);
+  padding: 0 14px; font-weight: 700; cursor: pointer; font-size: 0.8rem;
+}
+
+.toast {
+  position: fixed; bottom: calc(var(--nav-height) + 16px); left: 50%; transform: translateX(-50%);
+  background: var(--bg-elevated); color: var(--text-primary); padding: 10px 18px; border-radius: 24px;
+  font-size: 0.8rem; z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  border: 1px solid var(--border-glow);
+}
+.toast.show { opacity: 1; }
+
+a.text-link { color: var(--wa-green-light); cursor: pointer; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ AUTH SCREEN ═══════════ -->
+<div id="auth-screen">
+  <div class="auth-logo">
+    <div class="mark">✈️</div>
+    <h1>MigrateOS CRM</h1>
+    <p>Migrate Visa — staff sign in</p>
+  </div>
+  <div class="auth-card">
+    <div class="auth-error" id="auth-error"></div>
+    <label class="form-label">Email</label>
+    <input class="form-input" id="auth-email" type="email" placeholder="you@migratevisa.in" autocomplete="username">
+    <label class="form-label">Password</label>
+    <input class="form-input" id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="btn-primary" id="auth-submit" onclick="signIn()">Sign In</button>
+  </div>
+</div>
+
+<!-- ═══════════ APP ═══════════ -->
+<div id="app">
+
+  <!-- PAGE: LEADS -->
+  <div class="page active" id="page-leads">
+    <div class="page-header">
+      <div>
+        <h1>Leads</h1>
+        <div class="sub" id="staff-name"></div>
+      </div>
+      <div class="btn-icon" onclick="signOut()">⎋</div>
+    </div>
+    <div class="content">
+      <div class="search-row">
+        <input class="form-input" id="lead-search" placeholder="Search name or phone…" oninput="renderLeads()" style="margin-bottom:0">
+      </div>
+      <div class="chip-row" id="status-filters"></div>
+      <div id="leads-list"></div>
+    </div>
+    <button class="fab" onclick="openAddContact()">+</button>
+  </div>
+
+  <!-- PAGE: TASKS -->
+  <div class="page" id="page-tasks">
+    <div class="page-header">
+      <div><h1>Tasks</h1><div class="sub">Follow-ups across all leads</div></div>
+    </div>
+    <div class="content">
+      <div class="chip-row" id="task-filters"></div>
+      <div id="tasks-list"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: CONTACT DETAIL -->
+  <div class="page" id="page-detail">
+    <div class="page-header">
+      <div class="btn-icon" onclick="goToLeads()">←</div>
+      <div><h1>Lead Detail</h1></div>
+      <div style="width:34px"></div>
+    </div>
+    <div class="content" id="detail-content"></div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item active" id="nav-leads" onclick="showPage('leads')">
+      <span class="ic">👥</span><span>Leads</span>
+    </button>
+    <button class="nav-item" id="nav-tasks" onclick="showPage('tasks')">
+      <span class="ic">✓</span><span>Tasks</span>
+    </button>
+  </div>
+</div>
+
+<!-- Add Contact sheet -->
+<div class="overlay" id="add-contact-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><h2>New Lead</h2><div class="btn-icon" onclick="closeSheet('add-contact-overlay')">✕</div></div>
+    <label class="form-label">Full name *</label>
+    <input class="form-input" id="nc-name" placeholder="Client full name">
+    <label class="form-label">Phone</label>
+    <input class="form-input" id="nc-phone" placeholder="+91 …">
+    <label class="form-label">Email</label>
+    <input class="form-input" id="nc-email" placeholder="name@example.com">
+    <label class="form-label">Source</label>
+    <select class="form-input form-select" id="nc-source">
+      <option>Instagram</option><option>WhatsApp</option><option>Referral</option>
+      <option>Walk-in</option><option>Website</option><option>Other</option>
+    </select>
+    <label class="form-label">Service</label>
+    <select class="form-input form-select" id="nc-service">
+      <option>Tourist Visa</option><option>Visitor Visa</option><option>Study Visa</option>
+      <option>Work Visa</option><option>Business Visa</option><option>Job Placement</option><option>Other</option>
+    </select>
+    <label class="form-label">Country</label>
+    <select class="form-input form-select" id="nc-country">
+      <option>UAE</option><option>UK</option><option>Canada</option><option>Australia</option><option>Other</option>
+    </select>
+    <button class="btn-primary" onclick="saveNewContact()">Add Lead</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Supabase setup ──────────────────────────
+let sb = null;
+const SUPABASE_URL = 'https://xlvpbjjylxkbldeebyed.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsdnBiamp5bHhrYmxkZWVieWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTg2NzQsImV4cCI6MjA5NjA3NDY3NH0.5vZLXt4Zo3_iJuhm6tcVAyyyuyVE0A535CC-_1WP_bU';
+
+let currentUser = null;
+let currentProfile = null;
+let contacts = [];
+let profiles = [];
+let activeStatusFilter = 'all';
+let activeTaskFilter = 'mine';
+let activeContactId = null;
+
+const STATUSES = ['inquiry', 'documentation', 'filed', 'approved', 'rejected'];
+
+function initSupabase() {
+  const lib = window.supabase;
+  sb = lib.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Auth ─────────────────────────────────────
+async function signIn() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  const btn = document.getElementById('auth-submit');
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = 'Enter your email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+  await onSignedIn(data.user);
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null; currentProfile = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+async function onSignedIn(user) {
+  currentUser = user;
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  currentProfile = profile;
+  document.getElementById('staff-name').textContent = profile ? `Signed in as ${profile.full_name}` : '';
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await loadAll();
+}
+
+// ── Data loading ─────────────────────────────
+async function loadAll() {
+  const [{ data: c }, { data: p }] = await Promise.all([
+    sb.from('contacts').select('*').order('created_at', { ascending: false }),
+    sb.from('profiles').select('*'),
+  ]);
+  contacts = c || [];
+  profiles = p || [];
+  renderStatusFilters();
+  renderTaskFilters();
+  renderLeads();
+  renderTasks();
+}
+
+function profileName(id) {
+  const p = profiles.find(p => p.id === id);
+  return p ? p.full_name : '—';
+}
+
+// ── Navigation ───────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const nav = document.getElementById('nav-' + name);
+  if (nav) nav.classList.add('active');
+  document.querySelector('.bottom-nav').style.display = (name === 'detail') ? 'none' : 'flex';
+}
+function goToLeads() { showPage('leads'); }
+
+// ── Leads list ───────────────────────────────
+function renderStatusFilters() {
+  const el = document.getElementById('status-filters');
+  const all = ['all', ...STATUSES];
+  el.innerHTML = all.map(s => `
+    <div class="chip ${activeStatusFilter === s ? 'active' : ''}" onclick="setStatusFilter('${s}')">
+      ${s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+    </div>`).join('');
+}
+function setStatusFilter(s) { activeStatusFilter = s; renderStatusFilters(); renderLeads(); }
+
+function renderLeads() {
+  const q = document.getElementById('lead-search').value.trim().toLowerCase();
+  let list = contacts;
+  if (activeStatusFilter !== 'all') list = list.filter(c => c.status === activeStatusFilter);
+  if (q) list = list.filter(c =>
+    (c.full_name || '').toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q));
+
+  const el = document.getElementById('leads-list');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">No leads found.<br>Tap + to add one.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(c => `
+    <div class="contact-card" onclick="openDetail('${c.id}')">
+      <div class="contact-top">
+        <div>
+          <div class="contact-name">${escapeHtml(c.full_name)}</div>
+          <div class="contact-meta">${escapeHtml(c.phone || 'No phone')}</div>
+        </div>
+        <div class="status-badge status-${c.status}">${c.status}</div>
+      </div>
+      <div class="contact-tags">
+        ${c.service ? `<span class="tag">${escapeHtml(c.service)}</span>` : ''}
+        ${c.country ? `<span class="tag">${escapeHtml(c.country)}</span>` : ''}
+        ${c.assigned_to ? `<span class="tag">${escapeHtml(profileName(c.assigned_to))}</span>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ── Add contact ──────────────────────────────
+function openAddContact() { document.getElementById('add-contact-overlay').classList.add('active'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('active'); }
+
+async function saveNewContact() {
+  const name = document.getElementById('nc-name').value.trim();
+  if (!name) { showToast('Name is required'); return; }
+  const payload = {
+    full_name: name,
+    phone: document.getElementById('nc-phone').value.trim(),
+    email: document.getElementById('nc-email').value.trim(),
+    source: document.getElementById('nc-source').value,
+    service: document.getElementById('nc-service').value,
+    country: document.getElementById('nc-country').value,
+    status: 'inquiry',
+    assigned_to: currentUser.id,
+    created_by: currentUser.id,
+  };
+  const { data, error } = await sb.from('contacts').insert(payload).select().single();
+  if (error) { showToast('Error: ' + error.message); return; }
+  contacts.unshift(data);
+  closeSheet('add-contact-overlay');
+  ['nc-name','nc-phone','nc-email'].forEach(id => document.getElementById(id).value = '');
+  renderLeads();
+  showToast('Lead added');
+}
+
+// ── Contact detail ───────────────────────────
+async function openDetail(id) {
+  activeContactId = id;
+  showPage('detail');
+  await renderDetail();
+}
+
+async function renderDetail() {
+  const c = contacts.find(c => c.id === activeContactId);
+  if (!c) return;
+  const [{ data: notes }, { data: tasks }] = await Promise.all([
+    sb.from('notes').select('*').eq('contact_id', c.id).order('created_at', { ascending: false }),
+    sb.from('tasks').select('*').eq('contact_id', c.id).order('due_date', { ascending: true, nullsFirst: false }),
+  ]);
+
+  const statusOptions = STATUSES.map(s => `<option value="${s}" ${s===c.status?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-name">${escapeHtml(c.full_name)}</div>
+        <div class="detail-row">${c.phone ? '📞 ' + escapeHtml(c.phone) : ''}</div>
+        <div class="detail-row">${c.email ? '✉️ ' + escapeHtml(c.email) : ''}</div>
+      </div>
+    </div>
+    <select class="form-input form-select" id="detail-status" onchange="updateStatus()">${statusOptions}</select>
+    <div class="contact-tags" style="margin-bottom:6px">
+      ${c.service ? `<span class="tag">${escapeHtml(c.service)}</span>` : ''}
+      ${c.country ? `<span class="tag">${escapeHtml(c.country)}</span>` : ''}
+      ${c.source ? `<span class="tag">via ${escapeHtml(c.source)}</span>` : ''}
+    </div>
+
+    <div class="section-title">Tasks</div>
+    <div id="detail-tasks">
+      ${(tasks||[]).map(t => taskItemHtml(t)).join('') || '<div class="empty-state" style="padding:14px">No tasks yet</div>'}
+    </div>
+    <div class="inline-add">
+      <input class="form-input" id="new-task-title" placeholder="Follow-up call, send docs…">
+      <input class="form-input" type="date" id="new-task-due" style="max-width:140px">
+      <button onclick="addTask()">Add</button>
+    </div>
+
+    <div class="section-title">Notes</div>
+    <div id="detail-notes">
+      ${(notes||[]).map(n => `
+        <div class="note-item">
+          ${escapeHtml(n.body)}
+          <div class="note-meta">${profileName(n.created_by)} · ${new Date(n.created_at).toLocaleString()}</div>
+        </div>`).join('') || '<div class="empty-state" style="padding:14px">No notes yet</div>'}
+    </div>
+    <div class="inline-add">
+      <input class="form-input" id="new-note-body" placeholder="Add a note…">
+      <button onclick="addNote()">Add</button>
+    </div>
+  `;
+}
+
+function taskItemHtml(t) {
+  const overdue = t.due_date && !t.done && new Date(t.due_date) < new Date(new Date().toDateString());
+  return `
+    <div class="task-item ${t.done ? 'done' : ''}">
+      <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}', this.checked)">
+      <div>
+        <div class="task-title">${escapeHtml(t.title)}</div>
+        ${t.due_date ? `<div class="task-due ${overdue ? 'overdue' : ''}">Due ${t.due_date}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function updateStatus() {
+  const status = document.getElementById('detail-status').value;
+  const { error } = await sb.from('contacts').update({ status }).eq('id', activeContactId);
+  if (error) { showToast('Error: ' + error.message); return; }
+  const c = contacts.find(c => c.id === activeContactId);
+  c.status = status;
+  showToast('Status updated');
+}
+
+async function addTask() {
+  const title = document.getElementById('new-task-title').value.trim();
+  if (!title) return;
+  const due_date = document.getElementById('new-task-due').value || null;
+  const { error } = await sb.from('tasks').insert({
+    contact_id: activeContactId, title, due_date,
+    assigned_to: currentUser.id, created_by: currentUser.id,
+  });
+  if (error) { showToast('Error: ' + error.message); return; }
+  document.getElementById('new-task-title').value = '';
+  document.getElementById('new-task-due').value = '';
+  await renderDetail();
+  await refreshTasksOnly();
+}
+
+async function toggleTask(id, done) {
+  const { error } = await sb.from('tasks').update({ done }).eq('id', id);
+  if (error) { showToast('Error: ' + error.message); return; }
+  await renderDetail();
+  await refreshTasksOnly();
+}
+
+async function addNote() {
+  const body = document.getElementById('new-note-body').value.trim();
+  if (!body) return;
+  const { error } = await sb.from('notes').insert({ contact_id: activeContactId, body, created_by: currentUser.id });
+  if (error) { showToast('Error: ' + error.message); return; }
+  document.getElementById('new-note-body').value = '';
+  await renderDetail();
+}
+
+// ── Tasks page (cross-contact) ────────────────
+let allTasksCache = [];
+async function refreshTasksOnly() {
+  const { data } = await sb.from('tasks').select('*').order('due_date', { ascending: true, nullsFirst: false });
+  allTasksCache = data || [];
+  renderTasks();
+}
+
+function renderTaskFilters() {
+  const el = document.getElementById('task-filters');
+  const filters = [['mine','My Tasks'], ['overdue','Overdue'], ['all','All']];
+  el.innerHTML = filters.map(([k,label]) => `
+    <div class="chip ${activeTaskFilter===k?'active':''}" onclick="setTaskFilter('${k}')">${label}</div>`).join('');
+}
+function setTaskFilter(k) { activeTaskFilter = k; renderTaskFilters(); renderTasks(); }
+
+function renderTasks() {
+  let list = allTasksCache.filter(t => !t.done);
+  const today = new Date(new Date().toDateString());
+  if (activeTaskFilter === 'mine') list = list.filter(t => t.assigned_to === (currentUser && currentUser.id));
+  if (activeTaskFilter === 'overdue') list = list.filter(t => t.due_date && new Date(t.due_date) < today);
+
+  const el = document.getElementById('tasks-list');
+  if (!list.length) { el.innerHTML = `<div class="empty-state">Nothing here.</div>`; return; }
+  el.innerHTML = list.map(t => {
+    const c = contacts.find(c => c.id === t.contact_id);
+    const overdue = t.due_date && new Date(t.due_date) < today;
+    return `
+      <div class="contact-card" onclick="openDetail('${t.contact_id}')">
+        <div class="contact-top">
+          <div>
+            <div class="contact-name">${escapeHtml(t.title)}</div>
+            <div class="contact-meta">${c ? escapeHtml(c.full_name) : ''}</div>
+          </div>
+          ${t.due_date ? `<div class="status-badge ${overdue ? 'status-rejected' : 'status-inquiry'}">${t.due_date}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Boot ─────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  initSupabase();
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && session.user) {
+    await onSignedIn(session.user);
+    await refreshTasksOnly();
+  }
+});
+document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+</script>
+</body>
+</html>
